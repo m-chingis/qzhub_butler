@@ -1,0 +1,17 @@
+# Configuration file for the new server\cluster setup in automatic mode.
+---
+server: 
+  ip: "77.223.102.123"
+  port: # TODO: make use of this 
+  
+# User to be created and configured on the remote host
+remoteUser:
+  name: pushkin
+
+# Software to be installed on the remote server
+software:
+  list: path-to-list
+...
+# the above denotes the end of the document. However, there may be more documents
+# in the same file. parse_yaml just ignores these markers that are needed to be 
+# YAML compliant.
