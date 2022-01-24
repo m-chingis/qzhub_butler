@@ -6,7 +6,7 @@ server:
   
 # User to be created and configured on the remote host
 remoteUser:
-  name: pushkin
+  name: sm
 
 # Software to be installed on the remote server
 software:
