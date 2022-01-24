@@ -6,7 +6,7 @@ This script is meant to be used by Power users. It's assumed that you know what 
 Takiye dela ¯\\\_(ツ)_/¯
 
 But apart from that, I hope you will enjoy using it to automate your DevOps routines :)
-God bless your Linux!
+God save Linux!
 
 ## Credits
 - YAML Parser for Bash https://github.com/mrbaseman/parse_yaml.git
