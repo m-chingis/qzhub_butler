@@ -34,13 +34,14 @@ main() {
   local serverIP
   local runningOnServer=1 # 0 - true, 1... - false
   detect_exec_on_server # Is the script running on the target server?
-  
+ 
   if [[ $runningOnServer == 1 ]]; then # script is started on a client 
     upload_files_to_server
   fi
-
+   
   if [[ $(whoami) == "root" ]]; then
-    configure_remote_user
+    create_server_users
+    configure_my_user
   fi
 
   #TODO: hardening server security. Don't forget to add config option for non root user to upload files and do config.

@@ -31,14 +31,18 @@ function upload_files_to_server {
   echo ""
   echo "=== STEP 1: uploading neccessary files to the remote server. ==="
   echo "Looks like you are running this script on a client terminal."
-  echo "Now your SSH public key and 'qzhub_butler' directory will be copied to the target server."
+  echo "Directory 'qzhub_butler' will be copied to the target server."
   read -p "Should I proceed? (y/n): " 
 
   if [[ $REPLY == "y" ]]; then
-    echo ""
-    read -e -p "Specify your public SSH key to be uploaded to server: " \
-         -i "$HOME/.ssh/id_rsa.pub" 
-    cp $REPLY ./artefacts/public_ssh_key
+
+    if [[ $useYamlConfig != "y" ]]; then # if YAML config is used then SSH keys already in there      
+      echo ""
+      read -e -p "Specify your public SSH key to be uploaded to server: " \
+          -i "$HOME/.ssh/id_rsa.pub" 
+      cp $REPLY ./artefacts/public_ssh_key
+    fi
+   
     # ssh root@$serverIP "mkdir ~/qzhub_butler"       \
     #     && scp -r butler.sh                         \
     #               $CONFIG_YAML                      \
@@ -65,15 +69,45 @@ function upload_files_to_server {
   exit 0
 }
 
-function configure_remote_user {
+function create_server_users {
   echo ""
-  echo "=== STEP 2: remote user configuration. ==="
-  readonly local remoteUserName=$(get_var 'conf_remoteUser_name')
+  echo "=== STEP 2: creating users from YAML config. ==="
+
+  if [[ $useYamlConfig != "y" ]]; then        
+    echo "You chose not to use YAML config. Skipping the step."
+    return 0
+  fi
+
+  local counter=0
+  for f in $conf_users_ ; do 
+    ((++counter))
+    eval local login=\$${f}_login
+    eval local sshPubKey=\$${f}_sshPubKey
+    eval local groups=\$${f}_groups
+
+    if [[ $(getent passwd $login) ]]; then # user already exists
+      echo "$counter: User '$login' already exists. Skipping."
+      continue
+    fi
+
+    echo "$counter: Creating user '$login', group membership in '$groups'"
+    useradd -s /bin/bash -G $groups -m $login
+    mkdir -p -m 700 /home/$login/.ssh/
+    echo $sshPubKey >> /home/$login/.ssh/authorized_keys
+    chmod 600 /home/$login/.ssh/authorized_keys
+
+    cp -t /home/$login/ ./artefacts/.bash_aliases
+    chown -R $login:$login /home/$login
+  done
+}
+
+function configure_my_user {
+  echo ""
+  echo "=== STEP 3: my user configuration. ==="
+  readonly local myUserLogin=$(get_var 'conf_myUserLogin')
   
-  if [[ $(getent passwd $remoteUserName) ]]; then # user already exists
-    echo "User '$remoteUserName' already exists. Directory 'qzhub_butler' will be moved to his home dir."
-  else # user doesn't exist
-    echo "A new user '$remoteUserName' will be created."
+  if [[ ! $(getent passwd $myUserLogin) ]]; then # user doesn't exists
+    echo "A new user '$myUserLogin' will be created."
 
     local sudoGroup
     if [[ $(cat /proc/version | grep 'Ubuntu') ]]; then
@@ -83,26 +117,30 @@ function configure_remote_user {
     else
       read -p "Alas! I was unable to detect your OS family. Please indicate sudo-users group name (e.g.: wheel, sudo): " sudoGroup
     fi
-    useradd -s /bin/bash -G $sudoGroup -m $remoteUserName
+    useradd -s /bin/bash -G $sudoGroup -m $myUserLogin
     
-    echo "User '$remoteUserName' was created with 'sudo' rights."
-    passwd $remoteUserName
-  fi # if [[ $(getent passwd $remoteUserName) ]]
+    echo "User '$myUserLogin' was created with 'sudo' rights."
+    passwd $myUserLogin
+  fi # if [[ ! $(getent passwd $myUserLogin) ]]
 
-  mkdir -p -m 700 /home/$remoteUserName/.ssh/
-  cat ./artefacts/public_ssh_key >> /home/$remoteUserName/.ssh/authorized_keys
-  rm ./artefacts/public_ssh_key
-  if [[ -d "/home/$remoteUserName/qzhub_butler" ]]; then
-    echo "Directory '/home/$remoteUserName/qzhub_butler' already exists. It will be renamed to 'qzhub_butler.*date_time*'" 
-    mv /home/$remoteUserName/qzhub_butler{,.$(date +%Y%m%d_%H%M%S)}
+  if [[ $useYamlConfig != "y" ]]; then # if YAML config is used then SSH keys already in there, otherwise let's take it from file below
+    mkdir -p -m 700 /home/$myUserLogin/.ssh/
+    cat ./artefacts/public_ssh_key >> /home/$myUserLogin/.ssh/authorized_keys
+    rm ./artefacts/public_ssh_key
+    chown -R $myUserLogin:$myUserLogin /home/$myUserLogin/.ssh
+    chmod 600 /home/$myUserLogin/.ssh/authorized_keys
   fi
-  mv -f ../qzhub_butler /home/$remoteUserName
-  chown -R $remoteUserName:$remoteUserName /home/$remoteUserName/.ssh
-  chown -R $remoteUserName:$remoteUserName /home/$remoteUserName/qzhub_butler
-  chmod 600 /home/$remoteUserName/.ssh/authorized_keys
-  cd /home/$remoteUserName/qzhub_butler/artefacts/
-  mv -t /home/$remoteUserName/ .bashrc .bash_aliases
-  echo "Directory 'qzhub_butler' was moved to /home/$remoteUserName."
-  echo "Now reconnect to the server as '$remoteUserName' via SSH and run this script again."
+
+  echo "Moving 'qzhub_butler' directory to /home/$myUserLogin/"
+  
+  if [[ -d "/home/$myUserLogin/qzhub_butler" ]]; then
+    echo "Directory '/home/$myUserLogin/qzhub_butler' already exists. It will be renamed to 'qzhub_butler.*date_time*'" 
+    mv /home/$myUserLogin/qzhub_butler{,.$(date +%Y%m%d_%H%M%S)}
+  fi
+  mv -f ../qzhub_butler /home/$myUserLogin
+  chown -R $myUserLogin:$myUserLogin /home/$myUserLogin/qzhub_butler
+
+  echo "Directory 'qzhub_butler' was moved to /home/$myUserLogin."
+  echo "Now reconnect to the server as '$myUserLogin' via SSH and run this script again."
   exit 0  
 }

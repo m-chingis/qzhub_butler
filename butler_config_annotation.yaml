@@ -4,9 +4,18 @@ server:
   ip: "Remote server IP address"
   port: "Remote server's SSH port"
   
-# User to be created on the remote host
-remoteUser:
-  name: "Specify a username to be created on the remote server"
+users: # list of users to be created on a remote server. IMPORTANT: this list will be ignored by Butler in Interactive mode.
+  - # IMPORTANT: first line after each '-' should be empty. 
+    login: # login ¯\_(ツ)_/¯
+    sshPubKey: # e.g. "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQ   .....  ....  = user@example.com"
+    groups: #e.g. "sudo,kvm"
+  -
+    login: # second login
+    sshPubKey: # THIS PARAM IS MANDATORY
+    groups: # THIS PARAM IS OPTIONAL
+
+# User to be created on the remote host and configured for you to run Butler
+myUserLogin: "Specify a username to be created on the remote server"
 
 
 # README: everything below is for reference, will be deleted.
