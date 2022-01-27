@@ -34,14 +34,29 @@ main() {
   local serverIP
   local runningOnServer=1 # 0 - true, 1... - false
   detect_exec_on_server # Is the script running on the target server?
- 
+
   if [[ $runningOnServer == 1 ]]; then # script is started on a client 
+    echo ""
+    echo "=== STEP 1: uploading neccessary files to the remote server. ==="
     upload_files_to_server
   fi
    
   if [[ $(whoami) == "root" ]]; then
+    echo ""
+    echo "=== STEP 2: creating users from YAML config. ==="
     create_server_users
+
+    echo ""
+    echo "=== STEP 3: my user configuration. ==="
+    readonly local myUserLogin=$(get_var 'conf_myUserLogin')
     configure_my_user
+
+    echo ""
+    echo "=== STEP 4: sshd security hardening. ==="
+    sshd_security_hardening
+
+    echo "Now reconnect to the server as '$myUserLogin' via SSH and run this script again."
+    exit 0
   fi
 
   #TODO: hardening server security. Don't forget to add config option for non root user to upload files and do config.

@@ -28,8 +28,6 @@ function detect_exec_on_server {
 }
 
 function upload_files_to_server {
-  echo ""
-  echo "=== STEP 1: uploading neccessary files to the remote server. ==="
   echo "Looks like you are running this script on a client terminal."
   echo "Directory 'qzhub_butler' will be copied to the target server."
   read -p "Should I proceed? (y/n): " 
@@ -52,7 +50,10 @@ function upload_files_to_server {
     #               includes/                         \
     #               root@$serverIP:~/qzhub_butler
 
-    rsync -vvr                              \
+    local oldPort=$(get_var 'conf_server_oldPort')
+
+    rsync -vvr                                    \
+          -e "ssh -p $oldPort"                    \
           --exclude '.git'                        \
           --exclude '.gitignore'                  \
           --exclude 'qzhub_butler.code-workspace' \
@@ -70,9 +71,6 @@ function upload_files_to_server {
 }
 
 function create_server_users {
-  echo ""
-  echo "=== STEP 2: creating users from YAML config. ==="
-
   if [[ $useYamlConfig != "y" ]]; then        
     echo "You chose not to use YAML config. Skipping the step."
     return 0
@@ -92,6 +90,13 @@ function create_server_users {
 
     echo "$counter: Creating user '$login', group membership in '$groups'"
     useradd -s /bin/bash -G $groups -m $login
+
+    local pass=$(< /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c10)
+    echo "Your current password is: $pass" >> /home/$login/README # TODO(sm42): maybe worth adding encryption here.
+
+    chpasswd <<< "$login:$pass"
+    # passwd -e $login <-- decided to enable this when I figure out how to send password to users
+
     mkdir -p -m 700 /home/$login/.ssh/
     echo $sshPubKey >> /home/$login/.ssh/authorized_keys
     chmod 600 /home/$login/.ssh/authorized_keys
@@ -102,9 +107,6 @@ function create_server_users {
 }
 
 function configure_my_user {
-  echo ""
-  echo "=== STEP 3: my user configuration. ==="
-  readonly local myUserLogin=$(get_var 'conf_myUserLogin')
   
   if [[ ! $(getent passwd $myUserLogin) ]]; then # user doesn't exists
     echo "A new user '$myUserLogin' will be created."
@@ -124,6 +126,7 @@ function configure_my_user {
   fi # if [[ ! $(getent passwd $myUserLogin) ]]
 
   if [[ $useYamlConfig != "y" ]]; then # if YAML config is used then SSH keys already in there, otherwise let's take it from file below
+    cp -t /home/$myUserLogin/ ./artefacts/.bash_aliases
     mkdir -p -m 700 /home/$myUserLogin/.ssh/
     cat ./artefacts/public_ssh_key >> /home/$myUserLogin/.ssh/authorized_keys
     rm ./artefacts/public_ssh_key
@@ -141,6 +144,20 @@ function configure_my_user {
   chown -R $myUserLogin:$myUserLogin /home/$myUserLogin/qzhub_butler
 
   echo "Directory 'qzhub_butler' was moved to /home/$myUserLogin."
-  echo "Now reconnect to the server as '$myUserLogin' via SSH and run this script again."
-  exit 0  
+}
+
+function sshd_security_hardening {
+  local currentDate=$(date +%Y%m%d_%H%M%S)
+  cp /etc/ssh/sshd_config{,.bak.currentDate}
+  echo "Backup file: /etc/ssh/sshd_config.bak.$currentDate"
+
+  local server_newPort=$(get_var 'conf_server_newPort')
+  sed -i /etc/ssh/sshd_config \
+      -re 's/^(\#?)([[:space:]]*)(Port)([[:space:]]+)(.*)/\3 '"$server_newPort"' #Old string: \1\2\3\4\5/' \
+      -re 's/^(\#?)([[:space:]]*)(PermitRootLogin)([[:space:]]+)(.*)/\3 no #Old string: \1\2\3\4\5/' \
+      -re 's/^(\#?)([[:space:]]*)(PasswordAuthentication)([[:space:]]+)(.*)/\3 no #Old string: \1\2\3\4\5/' 
+  
+  echo "New settings to /etc/ssh/sshd_config were applied."
+
+  systemctl reload sshd
 }

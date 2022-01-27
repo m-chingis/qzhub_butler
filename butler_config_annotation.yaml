@@ -2,7 +2,8 @@
 ---
 server: 
   ip: "Remote server IP address"
-  port: "Remote server's SSH port"
+  oldPort: "Server's current port to be used for initial file transfer"
+  newPort: "Server's new port to be specified in /etc/ssh/sshd_config"
   
 users: # list of users to be created on a remote server. IMPORTANT: this list will be ignored by Butler in Interactive mode.
   - # IMPORTANT: first line after each '-' should be empty. 
